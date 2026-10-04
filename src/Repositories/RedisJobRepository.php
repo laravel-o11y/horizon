@@ -729,9 +729,10 @@ class RedisJobRepository implements JobRepository
      * Delete pending and reserved jobs for a queue.
      *
      * @param  string  $queue
+     * @param  string|null  $connection
      * @return int
      */
-    public function purge($queue)
+    public function purge($queue, $connection = null)
     {
         $count = 0;
         $cursor = 0;
@@ -744,7 +745,8 @@ class RedisJobRepository implements JobRepository
                 'pending_jobs',
                 config('horizon.prefix'),
                 $queue,
-                $cursor
+                $cursor,
+                (string) $connection
             );
 
             $count += $result[0];

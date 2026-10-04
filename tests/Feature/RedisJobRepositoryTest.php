@@ -81,6 +81,19 @@ class RedisJobRepositoryTest extends IntegrationTest
         $this->assertCount(2, $repository->getJobs([1, 2, 3, 4, 5]));
     }
 
+    public function test_it_only_purges_jobs_on_the_given_connection()
+    {
+        $repository = $this->app->make(JobRepository::class);
+
+        $repository->pushed('redis', 'default', new JobPayload(json_encode(['id' => 1, 'displayName' => 'first'])));
+        $repository->pushed('redis', 'default', new JobPayload(json_encode(['id' => 2, 'displayName' => 'second'])));
+        $repository->pushed('other', 'default', new JobPayload(json_encode(['id' => 3, 'displayName' => 'third'])));
+
+        $this->assertEquals(2, $repository->purge('default', 'redis'));
+        $this->assertEquals(1, $repository->countPending());
+        $this->assertEquals(['3'], $repository->getJobs([1, 2, 3])->pluck('id')->all());
+    }
+
     public function test_it_will_delete_a_failed_job()
     {
         $repository = $this->app->make(JobRepository::class);

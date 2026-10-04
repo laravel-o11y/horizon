@@ -42,6 +42,8 @@ LUA;
      * KEYS[2] - The name of the pending jobs sorted set
      * ARGV[1] - The prefix of the Horizon keys
      * ARGV[2] - The name of the queue to purge
+     * ARGV[3] - The cursor of the recent jobs scan
+     * ARGV[4] - The name of the connection to purge, or an empty string for every connection
      *
      * @return string
      */
@@ -58,10 +60,10 @@ LUA;
             for i = 1, #scanner[2], 2 do
                 local jobid = scanner[2][i]
                 local hashkey = ARGV[1] .. jobid
-                local job = redis.call('hmget', hashkey, 'status', 'queue')
+                local job = redis.call('hmget', hashkey, 'status', 'queue', 'connection')
 
                 -- Delete the pending / reserved jobs in the given queue
-                if((job[1] == 'reserved' or job[1] == 'pending') and job[2] == ARGV[2]) then
+                if((job[1] == 'reserved' or job[1] == 'pending') and job[2] == ARGV[2] and (ARGV[4] == '' or job[3] == ARGV[4])) then
                     redis.call('zrem', KEYS[1], jobid)
                     redis.call('zrem', KEYS[2], jobid)
                     redis.call('del', hashkey)

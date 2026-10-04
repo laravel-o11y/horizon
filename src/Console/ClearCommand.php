@@ -53,7 +53,7 @@ class ClearCommand extends Command
             ?: Arr::first($this->laravel['config']->get('horizon.defaults'))['connection'] ?? 'redis';
 
         if (method_exists($jobRepository, 'purge')) {
-            $jobRepository->purge($queue = $this->getQueue($connection));
+            $jobRepository->purge($queue = $this->getQueue($connection), $connection);
         }
 
         $count = $manager->connection($connection)->clear($queue);
