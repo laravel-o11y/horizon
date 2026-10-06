@@ -27,4 +27,15 @@ class TagRepositoryTest extends IntegrationTest
         $this->assertSame('24', $results[25]);
         $this->assertSame('0', $results[49]);
     }
+
+    public function test_monitored_returns_matching_tags()
+    {
+        $repo = resolve(TagRepository::class);
+
+        $repo->monitor('first');
+        $repo->monitor('second');
+
+        $this->assertEqualsCanonicalizing(['first'], array_values($repo->monitored(['first', 'third'])));
+        $this->assertSame([], $repo->monitored([]));
+    }
 }
