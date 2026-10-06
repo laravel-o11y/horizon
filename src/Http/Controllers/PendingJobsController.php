@@ -37,11 +37,7 @@ class PendingJobsController extends Controller
     {
         $jobs = $this->jobs
             ->getPending($request->query('starting_at', -1))
-            ->map(function ($job) {
-                $job->payload = json_decode($job->payload);
-
-                return $job;
-            })
+            ->map(fn ($job) => $this->decode($job))
             ->values();
 
         return [
