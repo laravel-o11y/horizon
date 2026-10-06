@@ -10,7 +10,6 @@
                 ready: false,
                 newTag: '',
                 addTagModal: null,
-                addTagModalOpened: false,
                 tags: []
             };
         },
