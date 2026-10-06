@@ -119,27 +119,19 @@ class RedisQueue extends BaseQueue
 
         $payload = (new JobPayload($this->createPayload(...$args)))->prepare($job)->value;
 
-        if (method_exists($this, 'enqueueUsing')) {
-            return $this->enqueueUsing(
-                $job,
-                $payload,
-                $queue,
-                $delay,
-                function ($payload, $queue, $delay) {
-                    $this->event($this->getQueue($queue), new JobPending($payload));
+        return $this->enqueueUsing(
+            $job,
+            $payload,
+            $queue,
+            $delay,
+            function ($payload, $queue, $delay) {
+                $this->event($this->getQueue($queue), new JobPending($payload));
 
-                    return tap(parent::laterRaw($delay, $payload, $queue), function () use ($payload, $queue) {
-                        $this->event($this->getQueue($queue), new JobPushed($payload));
-                    });
-                }
-            );
-        }
-
-        $this->event($this->getQueue($queue), new JobPending($payload));
-
-        return tap(parent::laterRaw($delay, $payload, $queue), function () use ($payload, $queue) {
-            $this->event($this->getQueue($queue), new JobPushed($payload));
-        });
+                return tap(parent::laterRaw($delay, $payload, $queue), function () use ($payload, $queue) {
+                    $this->event($this->getQueue($queue), new JobPushed($payload));
+                });
+            }
+        );
     }
 
     /**
