@@ -14,6 +14,8 @@ use Throwable;
 
 class RedisMetricsRepository implements MetricsRepository
 {
+    use UsesClusterAwarePipeline;
+
     /**
      * The Redis connection instance.
      *
@@ -81,8 +83,19 @@ class RedisMetricsRepository implements MetricsRepository
      */
     public function throughput()
     {
-        return collect($this->measuredQueues())
-            ->reduce(fn ($carry, $queue) => $carry + $this->connection()->hget('queue:'.$queue, 'throughput'), 0);
+        $queues = $this->measuredQueues();
+
+        if (empty($queues)) {
+            return 0;
+        }
+
+        $results = $this->pipeline(function ($pipe) use ($queues) {
+            foreach ($queues as $queue) {
+                $pipe->hget('queue:'.$queue, 'throughput');
+            }
+        });
+
+        return collect($results)->reduce(fn ($carry, $throughput) => $carry + (int) $throughput, 0);
     }
 
     /**
@@ -158,13 +171,9 @@ class RedisMetricsRepository implements MetricsRepository
      */
     public function queueWithMaximumRuntime()
     {
-        return collect($this->measuredQueues())
-            ->sortBy(function ($queue) {
-                if ($snapshots = $this->connection()->zrange('snapshot:queue:'.$queue, -1, -1)) {
-                    return json_decode($snapshots[0])->runtime;
-                }
-            })
-            ->last();
+        return collect($this->latestQueueSnapshots())
+            ->sortBy(fn ($latest) => $latest['snapshot']?->runtime)
+            ->last()['queue'] ?? null;
     }
 
     /**
@@ -174,13 +183,36 @@ class RedisMetricsRepository implements MetricsRepository
      */
     public function queueWithMaximumThroughput()
     {
-        return collect($this->measuredQueues())
-            ->sortBy(function ($queue) {
-                if ($snapshots = $this->connection()->zrange('snapshot:queue:'.$queue, -1, -1)) {
-                    return json_decode($snapshots[0])->throughput;
-                }
-            })
-            ->last();
+        return collect($this->latestQueueSnapshots())
+            ->sortBy(fn ($latest) => $latest['snapshot']?->throughput)
+            ->last()['queue'] ?? null;
+    }
+
+    /**
+     * Get the latest snapshot of each measured queue.
+     *
+     * @return array<int, array{queue: string, snapshot: object|null}>
+     */
+    protected function latestQueueSnapshots()
+    {
+        $queues = $this->measuredQueues();
+
+        if (empty($queues)) {
+            return [];
+        }
+
+        $results = $this->pipeline(function ($pipe) use ($queues) {
+            foreach ($queues as $queue) {
+                $pipe->zrange('snapshot:queue:'.$queue, -1, -1);
+            }
+        });
+
+        return collect($queues)
+            ->map(fn ($queue, $index) => [
+                'queue' => $queue,
+                'snapshot' => ! empty($results[$index]) ? json_decode($results[$index][0]) : null,
+            ])
+            ->all();
     }
 
     /**

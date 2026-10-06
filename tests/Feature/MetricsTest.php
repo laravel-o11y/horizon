@@ -218,6 +218,21 @@ class MetricsTest extends IntegrationTest
         $this->assertSame('slow', $repository->queueWithMaximumRuntime());
     }
 
+    public function test_queue_with_maximum_runtime_and_throughput_skips_queues_without_snapshots()
+    {
+        $repository = resolve(MetricsRepository::class);
+        $connection = $repository->connection();
+
+        $this->assertNull($repository->queueWithMaximumThroughput());
+        $this->assertNull($repository->queueWithMaximumRuntime());
+
+        $connection->sadd('measured_queues', 'queue:1', 'queue:unmeasured');
+        $connection->zadd('snapshot:queue:1', 0, json_encode(['throughput' => 5, 'runtime' => 7]));
+
+        $this->assertSame('1', $repository->queueWithMaximumThroughput());
+        $this->assertSame('1', $repository->queueWithMaximumRuntime());
+    }
+
     public function test_snapshot_does_not_fail_when_hmget_returns_null()
     {
         $connection = Mockery::mock();
